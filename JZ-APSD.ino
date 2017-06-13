@@ -14,6 +14,7 @@
  *    操控按钮：旋转编码器模块 (RotaryEncoder)
  *      库：https://github.com/0xPIT/encoder/tree/arduino
  *      TimerOne库：https://github.com/PaulStoffregen/TimerOne
+ *      旋转编码器原理：http://howtomechatronics.com/tutorials/arduino/rotary-encoder-works-use-arduino/
  *
  *    u8g库网址：
  *    https://github.com/olikraus/u8glib
