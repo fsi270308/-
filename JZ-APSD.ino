@@ -10,7 +10,11 @@
  *    显示屏：12864 OLED模块0.96寸 （SSD1306_128X64）
  *      接线方式：I2C  VCC->3.3V   GND->GND   SCL->SCL   SDA->SDA
  *      通信地址：0x78 (u8g库)
- *      
+ *    
+ *    操控按钮：旋转编码器模块 (RotaryEncoder)
+ *      库：https://github.com/0xPIT/encoder/tree/arduino
+ *      TimerOne库：https://github.com/PaulStoffregen/TimerOne
+ *
  *    u8g库网址：
  *    https://github.com/olikraus/u8glib
  *    
