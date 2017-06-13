@@ -53,11 +53,11 @@ Adafruit_BME280 bme; // I2C
 void draw(void) 
 {
   u8g.setFont(u8g_font_6x10);        // select font
-  u8g.drawStr(1, 12, "JZ-APSD");// 
-  u8g.setFont(u8g_font_fub14);        // select font for temperature readings
+  u8g.drawStr(1, 12, "JZ-APSD");
+  u8g.setFont(u8g_font_fub14);        
   u8g.setPrintPos(35, 40);     
   u8g.println(bme.readAltitude(SEALEVELPRESSURE_HPA), 0);
-  u8g.println("m");                        // prints C for Celsius
+  u8g.println("m");      
   u8g.drawRFrame(15, 15, 100, 30, 8);
 
   u8g.setFont(u8g_font_gdb12);
@@ -74,7 +74,7 @@ void setup(void)
 
 void loop(void) 
 {
-  bme.readTemperature();
+  bme.readTemperature();   //必须读取这些值才能计算出准确的大气压
   bme.readHumidity();
   
   u8g.firstPage();  
