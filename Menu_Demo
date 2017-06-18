@@ -392,7 +392,7 @@ void displayIntMenuPage(String menuItem, int value)
     display.setTextColor(WHITE);
     display.setCursor(15, 0);
     display.print(menuItem);
-    display.drawFastHLine(0,10,83,WHITE);
+    display.drawFastHLine(0,10,128,WHITE);
     display.setCursor(5, 15);
     display.print("Value");
     display.setTextSize(2);
@@ -409,7 +409,7 @@ void displayStringMenuPage(String menuItem, String value)
     display.setTextColor(WHITE);
     display.setCursor(15, 0);
     display.print(menuItem);
-    display.drawFastHLine(0,10,83,WHITE);
+    display.drawFastHLine(0,10,128,WHITE);
     display.setCursor(5, 15);
     display.print("Value");
     display.setTextSize(2);
