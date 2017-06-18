@@ -117,6 +117,7 @@ void loop() {
       menuitem=1;
     } 
   }
+  
   //----------------------子菜单参数递减-----------------------------------------
   else if (up && page == 2 && menuitem == 1 ) 
   {
@@ -146,6 +147,7 @@ void loop() {
       selectedDifficulty = 1;
     }
   }
+  
 //---------------------------主菜单参数递增---------------------------------------------------
   if (down && page == 1)              //We have turned the Rotary Encoder Clockwise
   {
@@ -171,6 +173,7 @@ void loop() {
       menuitem--;
     }  
   }
+  
   //---------------------子菜单参数递增----------------------------------------
   else if (down && page == 2 && menuitem == 1) 
   {
@@ -200,6 +203,7 @@ void loop() {
       selectedDifficulty = 0;
     }
   }
+  
   //-------------------中间按钮按下---------------------------------------
   if (middle) //Middle Button is Pressed
   {
@@ -209,15 +213,15 @@ void loop() {
     {
       if (vacuumPump) 
       {
-        vacuumPump = true;
-        menuItem5 = "Pump: ON";
-        turnPumpOn();
+        vacuumPump = false;
+        menuItem5 = "Pump: OFF";
+        turnPumpOff();
         }
       else 
       {
-        vacuumPump = false; 
-        menuItem5 = "Pump: OFF";
-        turnPumpOff();
+        vacuumPump = true; 
+        menuItem5 = "Pump: ON";
+        turnPumpOn();
        }
     }
 
@@ -338,7 +342,6 @@ void loop() {
   {    
    displayIntMenuPage(menuItem1, contrast);
   }
-
   else if (page==2 && menuitem == 2) 
   {
    displayIntMenuPage(menuItem2, volume);
@@ -351,13 +354,9 @@ void loop() {
   {
    displayStringMenuPage(menuItem4, difficulty[selectedDifficulty]);
   }
-  else if (page==2 && menuitem == 4) 
-  {
-   displayStringMenuPage(menuItem4, difficulty[selectedDifficulty]);
-  }
-  
-  }
+ }
 
+//----------------恢复默认值-------------------------------------------------
   void resetDefaults()
   {
     contrast = 60;
@@ -370,27 +369,31 @@ void loop() {
     turnPumpOff();
   }
 
+//-----------------泵手动启动------------------------------------
   void turnPumpOn()
   {
     digitalWrite(7,LOW);
   }
 
+//-----------------泵手动关闭---------------------------------------------
     void turnPumpOff()
   {
     digitalWrite(7,HIGH);
   }
 
+//-----------------旋转编码器时间程序---------------------------------------------------------
   void timerIsr() 
   {
   encoder->service();
-}
+  }
 
+//---------------------子菜单显示程序（int型）-------------------------------------------
 void displayIntMenuPage(String menuItem, int value)
 {
     display.setTextSize(1);
     display.clearDisplay();
     display.setTextColor(WHITE);
-    display.setCursor(15, 0);
+    display.setCursor(12, 0);
     display.print(menuItem);
     display.drawFastHLine(0,10,128,WHITE);
     display.setCursor(5, 15);
@@ -402,6 +405,7 @@ void displayIntMenuPage(String menuItem, int value)
     display.display();
 }
 
+//---------------------子菜单显示程序（string型）-------------------------------------------
 void displayStringMenuPage(String menuItem, String value)
 {
     display.setTextSize(1);
@@ -419,12 +423,14 @@ void displayStringMenuPage(String menuItem, String value)
     display.display();
 }
 
+//----------------------------主菜单显示程序--------------------------------------------
 void displayMenuItem(String item, int position, boolean selected)
 {
     if(selected)
     {
-      display.setTextColor(WHITE, BLACK);
-    }else
+      display.setTextColor(WHITE, BLACK);    //字体、填充颜色
+    }
+    else
     {
       display.setTextColor(BLACK, WHITE);
     }
