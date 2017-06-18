@@ -1,7 +1,9 @@
 /*
-2017.6.18
-菜单可显示
+ * 2017.6.18
+ * 菜单程序测试成功
 */
+
+//----------------------加载库文件--------------------------------------------
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -10,6 +12,7 @@
 #include <ClickEncoder.h>
 #include <TimerOne.h>
 
+//----------------------OLED屏设置------------------------------------
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
 
@@ -22,19 +25,20 @@ Adafruit_SSD1306 display(OLED_RESET);
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
+//----------------------定义变量------------------------------------
 int menuitem = 1;
 int frame = 1;
 int page = 1;
 int lastMenuItem = 1;
 
-String menuItem1 = "Contrast";
-String menuItem2 = "Volume";
-String menuItem3 = "Language";
-String menuItem4 = "Difficulty";
-String menuItem5 = "Light: ON";
+String menuItem1 = "Home Screen";
+String menuItem2 = "Sea Level Pressure";
+String menuItem3 = "Simulation Altitude";
+String menuItem4 = "PWM";
+String menuItem5 = "Pump: OFF";
 String menuItem6 = "Reset";
 
-boolean backlight = true;
+boolean vacuumPump = true;
 int contrast=60;
 int volume = 50;
 
@@ -54,15 +58,13 @@ int16_t last, value;
 
 void setup()   
 {
-  encoder = new ClickEncoder(A1, A0, A2);
+  encoder = new ClickEncoder(A1, A0, A2);  //CLK -> A1; DT -> A0; SW -> A2
   encoder->setAccelerationEnabled(false);
   
   Serial.begin(9600);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C); 
   display.display();
   display.clearDisplay();
-
-
 
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr); 
@@ -75,50 +77,59 @@ void setup()
 void loop() {
 
   drawMenu();
-
+//------------------旋转编码器按钮状态读取-----------------------------
   readRotaryEncoder();
 
    ClickEncoder::Button b = encoder->getButton();
-   if (b != ClickEncoder::Open) {
-   switch (b) {
+   if (b != ClickEncoder::Open) 
+   {
+      switch (b) 
+      {
       case ClickEncoder::Clicked:
-         middle=true;
+         middle = true;
         break;
-    }
-  }    
-  
-  if (up && page == 1 ) {
-     
+      }
+    }    
+    
+  //----------------------主菜单参数递减----------------------------------------
+  if (up && page == 1 ) 
+  {     
     up = false;
     if(menuitem == 2 && frame == 2)
     {
       frame--;
     }
+    if(menuitem == 3 && frame == 3)
+    {
+      frame--;
+    }
+    if(menuitem == 4 && frame == 4)
+    {
+      frame--;
+    }
 
-     if(menuitem==4 && frame ==4)
-    {
-      frame--;
-    }
-      if(menuitem==3 && frame ==3)
-    {
-      frame--;
-    }
+    
     lastMenuItem = menuitem;
     menuitem--;
+    
     if (menuitem==0)
     {
       menuitem=1;
     } 
-  }else if (up && page == 2 && menuitem==1 ) {
+  }
+  //----------------------子菜单参数递减-----------------------------------------
+  else if (up && page == 2 && menuitem == 1 ) 
+  {
     up = false;
     contrast--;
-
   }
-  else if (up && page == 2 && menuitem==2 ) {
+  else if (up && page == 2 && menuitem == 2 ) 
+  {
     up = false;
     volume--;
   }
-  else if (up && page == 2 && menuitem==3 ) {
+  else if (up && page == 2 && menuitem == 3 ) 
+  {
     up = false;
     selectedLanguage--;
     if(selectedLanguage == -1)
@@ -126,7 +137,8 @@ void loop() {
       selectedLanguage = 2;
     }
   }
-    else if (up && page == 2 && menuitem==4 ) {
+  else if (up && page == 2 && menuitem == 4 ) 
+  {
     up = false;
     selectedDifficulty--;
     if(selectedDifficulty == -1)
@@ -134,39 +146,44 @@ void loop() {
       selectedDifficulty = 1;
     }
   }
-
-  if (down && page == 1) //We have turned the Rotary Encoder Clockwise
+//---------------------------主菜单参数递增---------------------------------------------------
+  if (down && page == 1)              //We have turned the Rotary Encoder Clockwise
   {
-
     down = false;
-    if(menuitem==3 && lastMenuItem == 2)
-    {
-      frame ++;
-    }else  if(menuitem==4 && lastMenuItem == 3)
+    if(menuitem == 3 && lastMenuItem == 2)
     {
       frame ++;
     }
-     else  if(menuitem==5 && lastMenuItem == 4 && frame!=4)
+    else if(menuitem == 4 && lastMenuItem == 3)
     {
       frame ++;
     }
+    else if(menuitem == 5 && lastMenuItem == 4 && frame!=4)
+    {
+      frame ++;
+    }
+    
     lastMenuItem = menuitem;
     menuitem++;  
+    
     if (menuitem==7) 
     {
       menuitem--;
-    }
-  
-  }else if (down && page == 2 && menuitem==1) {
+    }  
+  }
+  //---------------------子菜单参数递增----------------------------------------
+  else if (down && page == 2 && menuitem == 1) 
+  {
     down = false;
     contrast++;
-
   }
-  else if (down && page == 2 && menuitem==2) {
+  else if (down && page == 2 && menuitem == 2) 
+  {
     down = false;
     volume++;
   }
-   else if (down && page == 2 && menuitem==3 ) {
+  else if (down && page == 2 && menuitem == 3 ) 
+  {
     down = false;
     selectedLanguage++;
     if(selectedLanguage == 3)
@@ -174,7 +191,8 @@ void loop() {
       selectedLanguage = 0;
     }
   }
-  else if (down && page == 2 && menuitem==4 ) {
+  else if (down && page == 2 && menuitem == 4 ) 
+  {
     down = false;
     selectedDifficulty++;
     if(selectedDifficulty == 2)
@@ -182,37 +200,38 @@ void loop() {
       selectedDifficulty = 0;
     }
   }
-  
+  //-------------------中间按钮按下---------------------------------------
   if (middle) //Middle Button is Pressed
   {
     middle = false;
    
-    if (page == 1 && menuitem==5) // Backlight Control 
+    if (page == 1 && menuitem==5)       // vacuumPump Control 
     {
-      if (backlight) 
+      if (vacuumPump) 
       {
-        backlight = false;
-        menuItem5 = "Light: OFF";
-        turnBacklightOff();
+        vacuumPump = true;
+        menuItem5 = "Pump: ON";
+        turnPumpOn();
         }
       else 
       {
-        backlight = true; 
-        menuItem5 = "Light: ON";
-        turnBacklightOn();
+        vacuumPump = false; 
+        menuItem5 = "Pump: OFF";
+        turnPumpOff();
        }
     }
 
-    if(page == 1 && menuitem ==6)// Reset
+    if(page == 1 && menuitem ==6)      // Reset
     {
       resetDefaults();
     }
 
 
-    else if (page == 1 && menuitem<=4) {
+    else if (page == 1 && menuitem<=4) 
+    {
       page=2;
      }
-      else if (page == 2) 
+    else if (page == 2) 
      {
       page=1; 
      }
@@ -222,96 +241,96 @@ void loop() {
   void drawMenu()
   {
     
-  if (page==1) 
+  if (page == 1) 
   {    
     display.setTextSize(1);
     display.clearDisplay();
-    display.setTextColor(BLACK, WHITE);
-    display.setCursor(15, 0);
+    display.setTextColor(WHITE);
+    display.setCursor(37, 0);
     display.print("MAIN MENU");
-    display.drawFastHLine(0,10,83,BLACK);
+    display.drawFastHLine(0,10,128,WHITE);
 
-    if(menuitem==1 && frame ==1)
+    if(menuitem == 1 && frame == 1)
     {   
-      displayMenuItem(menuItem1, 15,true);
-      displayMenuItem(menuItem2, 25,false);
-      displayMenuItem(menuItem3, 35,false);
+      displayMenuItem(menuItem1, 15,false);
+      displayMenuItem(menuItem2, 25,true);
+      displayMenuItem(menuItem3, 35,true);
     }
     else if(menuitem == 2 && frame == 1)
     {
-      displayMenuItem(menuItem1, 15,false);
-      displayMenuItem(menuItem2, 25,true);
-      displayMenuItem(menuItem3, 35,false);
-    }
-    else if(menuitem == 3 && frame == 1)
-    {
-      displayMenuItem(menuItem1, 15,false);
+      displayMenuItem(menuItem1, 15,true);
       displayMenuItem(menuItem2, 25,false);
       displayMenuItem(menuItem3, 35,true);
     }
+    else if(menuitem == 3 && frame == 1)
+    {
+      displayMenuItem(menuItem1, 15,true);
+      displayMenuItem(menuItem2, 25,true);
+      displayMenuItem(menuItem3, 35,false);
+    }
      else if(menuitem == 4 && frame == 2)
     {
-      displayMenuItem(menuItem2, 15,false);
-      displayMenuItem(menuItem3, 25,false);
-      displayMenuItem(menuItem4, 35,true);
+      displayMenuItem(menuItem2, 15,true);
+      displayMenuItem(menuItem3, 25,true);
+      displayMenuItem(menuItem4, 35,false);
     }
 
       else if(menuitem == 3 && frame == 2)
     {
-      displayMenuItem(menuItem2, 15,false);
-      displayMenuItem(menuItem3, 25,true);
-      displayMenuItem(menuItem4, 35,false);
+      displayMenuItem(menuItem2, 15,true);
+      displayMenuItem(menuItem3, 25,false);
+      displayMenuItem(menuItem4, 35,true);
     }
     else if(menuitem == 2 && frame == 2)
     {
-      displayMenuItem(menuItem2, 15,true);
-      displayMenuItem(menuItem3, 25,false);
-      displayMenuItem(menuItem4, 35,false);
+      displayMenuItem(menuItem2, 15,false);
+      displayMenuItem(menuItem3, 25,true);
+      displayMenuItem(menuItem4, 35,true);
     }
     
     else if(menuitem == 5 && frame == 3)
     {
-      displayMenuItem(menuItem3, 15,false);
-      displayMenuItem(menuItem4, 25,false);
-      displayMenuItem(menuItem5, 35,true);
+      displayMenuItem(menuItem3, 15,true);
+      displayMenuItem(menuItem4, 25,true);
+      displayMenuItem(menuItem5, 35,false);
     }
 
     else if(menuitem == 6 && frame == 4)
     {
-      displayMenuItem(menuItem4, 15,false);
-      displayMenuItem(menuItem5, 25,false);
-      displayMenuItem(menuItem6, 35,true);
+      displayMenuItem(menuItem4, 15,true);
+      displayMenuItem(menuItem5, 25,true);
+      displayMenuItem(menuItem6, 35,false);
     }
     
       else if(menuitem == 5 && frame == 4)
     {
-      displayMenuItem(menuItem4, 15,false);
-      displayMenuItem(menuItem5, 25,true);
-      displayMenuItem(menuItem6, 35,false);
+      displayMenuItem(menuItem4, 15,true);
+      displayMenuItem(menuItem5, 25,false);
+      displayMenuItem(menuItem6, 35,true);
     }
       else if(menuitem == 4 && frame == 4)
     {
-      displayMenuItem(menuItem4, 15,true);
-      displayMenuItem(menuItem5, 25,false);
-      displayMenuItem(menuItem6, 35,false);
+      displayMenuItem(menuItem4, 15,false);
+      displayMenuItem(menuItem5, 25,true);
+      displayMenuItem(menuItem6, 35,true);
     }
     else if(menuitem == 3 && frame == 3)
     {
-      displayMenuItem(menuItem3, 15,true);
-      displayMenuItem(menuItem4, 25,false);
-      displayMenuItem(menuItem5, 35,false);
+      displayMenuItem(menuItem3, 15,false);
+      displayMenuItem(menuItem4, 25,true);
+      displayMenuItem(menuItem5, 35,true);
     }
         else if(menuitem == 2 && frame == 2)
     {
-      displayMenuItem(menuItem2, 15,true);
-      displayMenuItem(menuItem3, 25,false);
-      displayMenuItem(menuItem4, 35,false);
+      displayMenuItem(menuItem2, 15,false);
+      displayMenuItem(menuItem3, 25,true);
+      displayMenuItem(menuItem4, 35,true);
     }
     else if(menuitem == 4 && frame == 3)
     {
-      displayMenuItem(menuItem3, 15,false);
-      displayMenuItem(menuItem4, 25,true);
-      displayMenuItem(menuItem5, 35,false);
+      displayMenuItem(menuItem3, 15,true);
+      displayMenuItem(menuItem4, 25,false);
+      displayMenuItem(menuItem5, 35,true);
     }   
     display.display();
   }
@@ -346,24 +365,23 @@ void loop() {
     selectedLanguage = 0;
     selectedDifficulty = 0;
 
-    backlight = true;
-    menuItem5 = "Light: ON";
-    turnBacklightOn();
+    vacuumPump = false;
+    menuItem5 = "Pump: OFF";
+    turnPumpOff();
   }
 
-
-
-  void turnBacklightOn()
+  void turnPumpOn()
   {
     digitalWrite(7,LOW);
   }
 
-    void turnBacklightOff()
+    void turnPumpOff()
   {
     digitalWrite(7,HIGH);
   }
 
-  void timerIsr() {
+  void timerIsr() 
+  {
   encoder->service();
 }
 
@@ -371,10 +389,10 @@ void displayIntMenuPage(String menuItem, int value)
 {
     display.setTextSize(1);
     display.clearDisplay();
-    display.setTextColor(BLACK, WHITE);
+    display.setTextColor(WHITE);
     display.setCursor(15, 0);
     display.print(menuItem);
-    display.drawFastHLine(0,10,83,BLACK);
+    display.drawFastHLine(0,10,83,WHITE);
     display.setCursor(5, 15);
     display.print("Value");
     display.setTextSize(2);
@@ -388,10 +406,10 @@ void displayStringMenuPage(String menuItem, String value)
 {
     display.setTextSize(1);
     display.clearDisplay();
-    display.setTextColor(BLACK, WHITE);
+    display.setTextColor(WHITE);
     display.setCursor(15, 0);
     display.print(menuItem);
-    display.drawFastHLine(0,10,83,BLACK);
+    display.drawFastHLine(0,10,83,WHITE);
     display.setCursor(5, 15);
     display.print("Value");
     display.setTextSize(2);
@@ -414,15 +432,19 @@ void displayMenuItem(String item, int position, boolean selected)
     display.print(">"+item);
 }
 
+//----------------------旋转编码器读取------------------------------------------
 void readRotaryEncoder()
 {
   value += encoder->getValue();
   
-  if (value/2 > last) {
+  if (value/2 > last) 
+  {
     last = value/2;
     down = true;
     delay(150);
-  }else   if (value/2 < last) {
+  }
+  else if (value/2 < last) 
+  {
     last = value/2;
     up = true;
     delay(150);
