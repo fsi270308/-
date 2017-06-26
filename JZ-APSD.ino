@@ -44,6 +44,19 @@
  * 菜单程序测试成功
  * 2017.6.20
  * 增加继电器控制程序
+ * 2017.6.23
+ * 试验，泵启动到达设定值，补偿几次之后死机，泵工作不停。
+ * 旋转编码器使用了中断，与I2C通讯冲突。
+ * 2017.6.24
+ * 死机原因参考1：http://www.dfrobot.com.cn/community/thread-12607-1-1.html
+ * 死机原因参考2：http://www.wendangku.net/doc/8793f268561252d380eb6e79.html
+ *    1.已在主循环中读取变量前关闭全局中断，完成后打开全局中断。
+ *    2.减少函数调用层级，减少局部变量，测试30分钟，未死机。
+ *    3.运行中气压传感器线接头接触不良也有可能导致死机。
+ *    4.电源需接地，信号线加滤波器
+ *    5.高速信号线I2C远离信号输入端
+ * 2017.6.26
+ * 程序优化，追加buff2，进一步减少局部变量。
 */
 
 //----------------------加载库文件--------------------------------------------
@@ -86,15 +99,16 @@ int lastMenuItem = 1;
 String menuItem1 = "Home Screen";
 String menuItem2 = "Sea Level Pressure";
 String menuItem3 = "Simulation Altitude";
-String menuItem4 = "Buff";
-String menuItem5 = "Pump: OFF";
+String menuItem4 = "Buff1";
+String menuItem5 = "Buff2";
 String menuItem6 = "Reset";
 
 boolean vacuumPump = false;
 int seaLevelPressure = 1013;
 int siAltitude = 0;
 float siAltitudeHm = 1.0; 
-float buff = 10.0;  //默认缓冲高度10m
+float buff1 = 20.0;  //默认缓冲高度20m
+float buff2 = 5.0;  //默认滞后5m
 
 //String language[3] = { "EN", "ES", "EL" };
 //int selectedLanguage = 0;
@@ -115,10 +129,11 @@ int pump2 = 7;    //泵2控制线D7
 
 void setup()   
 {
-  encoder = new ClickEncoder(A1, A0, A2);  //CLK -> A1; DT -> A0; SW -> A2
+  encoder = new ClickEncoder(A0, A1, A2);  //CLK -> A1; DT -> A0; SW -> A2
   encoder->setAccelerationEnabled(false);
-  
-  Serial.begin(9600);
+
+  Wire.begin();  
+
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C); 
   display.display();
   display.clearDisplay();
@@ -131,7 +146,10 @@ void setup()
 //-----------气压传感器启动----------------------------------
   bme.begin();
 //------------真空泵初始化-----------------------------------
-  pumpInit();
+  pinMode(pump1, OUTPUT);
+  pinMode(pump2, OUTPUT);
+  digitalWrite(pump1, HIGH);
+  digitalWrite(pump2, HIGH);
 }
 
 
@@ -151,18 +169,32 @@ void loop()
   drawMenu();
   
 //------------------旋转编码器按钮状态读取-----------------------------
-  readRotaryEncoder();
-
-   ClickEncoder::Button b = encoder->getButton();
+   noInterrupts();
+   //readRotaryEncoder();
+  value += encoder->getValue();  
+  if (value/2 > last) 
+  {
+    last = value/2;
+    down = true;
+    delay(150);
+  }
+  else if (value/2 < last) 
+  {
+    last = value/2;
+    up = true;
+    delay(50);
+  }
+   ClickEncoder::Button b = encoder->getButton();   
    if (b != ClickEncoder::Open) 
    {
       switch (b) 
       {
       case ClickEncoder::Clicked:
-         middle = true;
+        middle = true;
         break;
       }
     }    
+  interrupts();
     
   //----------------------主菜单参数递减----------------------------------------
   if (up && page == 1 ) 
@@ -205,21 +237,21 @@ void loop()
   else if (up && page == 2 && menuitem == 4 ) 
   {
     up = false;
-    buff--;
-    if(buff == -1.00)
+    buff1--;
+    if(buff1 == -1.00)
     {
-      buff = 50;
+      buff1 = 100;
     }
   }
- // else if (up && page == 2 && menuitem == 5 ) 
- // {
- //   up = false;
- //   selectedDifficulty--;
- //   if(selectedDifficulty == -1)
- //   {
- //     selectedDifficulty = 1;
- //   }
- // }
+  else if (up && page == 2 && menuitem == 5 ) 
+  {
+    up = false;
+    buff2--;
+    if(buff2 == -1.00)
+    {
+      buff2 = 10;
+    }
+  }
   
 //---------------------------主菜单参数递增---------------------------------------------------
   if (down && page == 1)              //We have turned the Rotary Encoder Clockwise
@@ -261,42 +293,42 @@ void loop()
   else if (down && page == 2 && menuitem == 4) 
   {
     down = false;
-    buff++;
-    if(buff == 51.00)
+    buff1++;
+    if(buff1 == 101.00)
     {
-      buff = 0;
+      buff1 = 0;
     }
    }
-//  else if (down && page == 2 && menuitem == 5) 
-//  {
-//    down = false;
-//    selectedDifficulty++;
-//    if(selectedDifficulty == 2)
-//    {
-//      selectedDifficulty = 0;
-//    }
-//   }
+  else if (down && page == 2 && menuitem == 5) 
+  {
+    down = false;
+    buff2++;
+    if(buff2 == 11.00)
+    {
+      buff2 = 0;
+    }
+   }
   
   //-------------------中间按钮按下---------------------------------------
   if (middle) //Middle Button is Pressed
   {
     middle = false;
    
-    if (page == 1 && menuitem==5)       // vacuumPump Control 
-    {
-      if (vacuumPump) 
-      {
-        
-        menuItem5 = "Pump: ON";
-        
-        }
-      else 
-      {
-         
-        menuItem5 = "Pump: OFF";
-
-       }
-    }
+  //  if (page == 1 && menuitem==5)       // vacuumPump Control 
+  //  {
+  //    if (vacuumPump) 
+  //    {
+  //      
+  //      menuItem5 = "Pump: ON";
+  //      
+ //       }
+  //    else 
+  //    {
+  //       
+ //       menuItem5 = "Pump: OFF";
+//
+ //      }
+ //   }
 
     if(page == 1 && menuitem == 6)      // Reset
     {
@@ -304,7 +336,7 @@ void loop()
     }
 
 
-    else if (page == 1 && menuitem<=4) 
+    else if (page == 1 && menuitem <= 5) 
     {
       page=2;
      }
@@ -312,7 +344,9 @@ void loop()
      {
       page=1; 
      }
-   }   
+   }
+
+   delay(50);
   }
 //--------------------------↑↑↑Loop↑↑↑------------------------------------------
   
@@ -426,7 +460,11 @@ void loop()
   }
   else if (page==2 && menuitem == 4) 
   {
-   displayFloatMenuPage(menuItem4, buff);
+   displayFloatMenuPage(menuItem4, buff1);
+  }
+  else if (page==2 && menuitem == 5) 
+  {
+   displayFloatMenuPage(menuItem5, buff2);
   }
  }
 
@@ -435,12 +473,13 @@ void loop()
   {
     seaLevelPressure = 1013;
     siAltitude = 0;
-    buff = 10.0;
+    buff1 = 20.0;
+    buff2 = 5.0;
     //selectedDifficulty = 0;
 
     vacuumPump = false;
-    menuItem5 = "Pump: OFF";
-    turnPumpOff();
+    //menuItem5 = "Pump: OFF";
+    //turnPumpOff();
   }
 
 //-----------------泵启动------------------------------------
@@ -449,32 +488,32 @@ void loop()
     float altiRead = bme.readAltitude(SEALEVELPRESSURE_HPA);
     if(altiRead < siAltitudeHm)
     {
-      if(altiRead < siAltitudeHm - buff)
+      if(altiRead < siAltitudeHm - buff1)
       {
-        pump1Start();
-        pump2Start();
-        vacuumPump = true;
+        digitalWrite(pump1, LOW);   //pump1Start
+        digitalWrite(pump2, LOW);   //pump2Start
+        //vacuumPump = true;
       }
-      else if((altiRead >= siAltitudeHm - buff) && altiRead < siAltitudeHm)
+      else if((altiRead >= siAltitudeHm - buff1) && altiRead < siAltitudeHm - buff2)
       {
-        pump1Stop();
-        pump2Start();
-        vacuumPump = true;
+        digitalWrite(pump1, HIGH);   //pump1Stop
+        digitalWrite(pump2, LOW);   //pump2Start
+       // vacuumPump = true;
       }
     }
-    else if(altiRead >= siAltitudeHm + 10)
+    else if(altiRead >= siAltitudeHm + buff2)
     {
-      pump1Stop();
-      pump2Stop();
-      vacuumPump = false;
+      digitalWrite(pump1, HIGH);   //pump1Stop
+      digitalWrite(pump2, HIGH);   //pump2Stop
+      //vacuumPump = false;
     }
   }
 
 //-----------------泵关闭---------------------------------------------
     void turnPumpOff()
   {
-    pump1Stop();
-    pump2Stop();
+    digitalWrite(pump1, HIGH);   //pump1Stop
+    digitalWrite(pump2, HIGH);   //pump2Stop
   }
 
 //-----------------旋转编码器时间程序---------------------------------------------------------
@@ -583,10 +622,12 @@ void displayMenuItem(String item, int position, boolean selected)
 }
 
 //----------------------旋转编码器读取------------------------------------------
-void readRotaryEncoder()
+/*
+ * 
+ void readRotaryEncoder()
 {
-  value += encoder->getValue();
   
+  value += encoder->getValue();  
   if (value/2 > last) 
   {
     last = value/2;
@@ -597,12 +638,13 @@ void readRotaryEncoder()
   {
     last = value/2;
     up = true;
-    delay(150);
+    delay(50);
   }
 }
-
+*/
 //-------------------------真空泵程序------------------------------------------------
-void pumpInit()  //初始化
+/*
+ * void pumpInit()  //初始化
 {
   pinMode(pump1, OUTPUT);
   pinMode(pump2, OUTPUT);
@@ -612,20 +654,21 @@ void pumpInit()  //初始化
 
 void pump1Start()
 {
-  digitalWrite(pump1, LOW);
+  digitalWrite(pump1, LOW);   //pump1Start
 }
 
 void pump2Start()
 {
-  digitalWrite(pump2, LOW);
+  digitalWrite(pump2, LOW);   //pump2Start
 }
 
 void pump1Stop()
 {
-  digitalWrite(pump1, HIGH);
+  digitalWrite(pump1, HIGH);   //pump1Stop
 }
 
 void pump2Stop()
 {
-  digitalWrite(pump2, HIGH);
+  digitalWrite(pump2, HIGH);   //pump2Stop
 }
+*/
