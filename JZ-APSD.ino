@@ -50,13 +50,18 @@
  * 2017.6.24
  * 死机原因参考1：http://www.dfrobot.com.cn/community/thread-12607-1-1.html
  * 死机原因参考2：http://www.wendangku.net/doc/8793f268561252d380eb6e79.html
- *    1.已在主循环中读取变量前关闭全局中断，完成后打开全局中断。
+ *    1.已在主循环中读取开关变量前关闭全局中断，完成后打开全局中断。
  *    2.减少函数调用层级，减少局部变量，测试30分钟，未死机。
  *    3.运行中气压传感器线接头接触不良也有可能导致死机。
  *    4.电源需接地，信号线加滤波器
  *    5.高速信号线I2C远离信号输入端
  * 2017.6.26
  * 程序优化，追加buff2，进一步减少局部变量。
+ * 加看门狗Adafruit_SleepyDog.h，加断电保存，
+ * EEPROM保存float型数据参考：http://www.arduino.cn/thread-2684-1-1.html
+ * 2017.6.27
+ * 原来是OLED连接线问题，排线时候使用了一根U槽传感器的四芯线，较细，而且有1米左右，线路绕在开关电源附近；
+ * 更换了一根较粗的半米长四芯线，远离开关电源，问题解除，看门狗也不需要了。：P
 */
 
 //----------------------加载库文件--------------------------------------------
@@ -70,6 +75,10 @@
 
 #include <ClickEncoder.h>
 #include <TimerOne.h>
+
+#include <EEPROM.h>
+
+#include <Adafruit_SleepyDog.h>
 
 //----------------------大气压传感器本地海平面设置--------------------------------------
 #define SEALEVELPRESSURE_HPA (seaLevelPressure)  //当地当天海平面大气压
@@ -107,14 +116,14 @@ boolean vacuumPump = false;
 int seaLevelPressure = 1013;
 int siAltitude = 0;
 float siAltitudeHm = 1.0; 
-float buff1 = 20.0;  //默认缓冲高度20m
-float buff2 = 5.0;  //默认滞后5m
+float buff1 = 20.0;  //默认大泵缓冲高度20m
+float buff2 = 1.0;  //默认小泵滞后10m
+int a1 = 0;
+int a2 = 0;
 
-//String language[3] = { "EN", "ES", "EL" };
-//int selectedLanguage = 0;
+int addr = 0;
+float a3 = 0.0;
 
-//String difficulty[2] = { "EASY", "HARD" };
-//int selectedDifficulty = 0;
 
 boolean up = false;
 boolean down = false;
@@ -125,6 +134,7 @@ int16_t last, value;
 
 int pump1 = 6;    //泵1控制线D6
 int pump2 = 7;    //泵2控制线D7
+int i = 0;
 
 
 void setup()   
@@ -150,16 +160,58 @@ void setup()
   pinMode(pump2, OUTPUT);
   digitalWrite(pump1, HIGH);
   digitalWrite(pump2, HIGH);
+  
+//------------EEPROM------------------------------------
+        a1 = EEPROM.read(1);
+        a2 = EEPROM.read(2);
+        a3 = EEPROM.read(3);
+
+  seaLevelPressure = a1 * 4;
+  siAltitude = a2;
+  buff2 = a3;
 }
+
 
 
 //-------------------↓↓↓Loop↓↓↓----------------------------------------------------
 void loop() 
-{
+{  
+    if(bme.readAltitude(SEALEVELPRESSURE_HPA) < siAltitudeHm)
+    {
+      if(bme.readAltitude(SEALEVELPRESSURE_HPA) < siAltitudeHm - buff1)
+      {
+        digitalWrite(pump1, LOW);   //pump1Start
+        digitalWrite(pump2, LOW);   //pump2Start
+        
+      }
+      else if(bme.readAltitude(SEALEVELPRESSURE_HPA) >= siAltitudeHm - buff1 && bme.readAltitude(SEALEVELPRESSURE_HPA) < siAltitudeHm - buff2)
+      {
+        digitalWrite(pump1, HIGH);   //pump1Stop
+        digitalWrite(pump2, LOW);   //pump2Start
+       vacuumPump = true;       
+      }
+    }
+    else if(bme.readAltitude(SEALEVELPRESSURE_HPA) >= siAltitudeHm + buff2)
+    {
+      digitalWrite(pump1, HIGH);   //pump1Stop
+      digitalWrite(pump2, HIGH);   //pump2Stop
+      
+    }
 
-  turnPumpOn();  //泵启动
+    if(vacuumPump)
+    {
+      vacuumPump = false;
+      i ++;
+      delay(100);
+    }
+    if(i >= 60)
+    {
+      i = 0;
+      Watchdog.enable(50);   //补偿n次后看门狗启动。
+      
+    }
   
-  siAltitudeHm = siAltitude * 100;   //显示为百米
+  siAltitudeHm = siAltitude * 100;   //显示为n百米
   
 //----------------bme读取温湿度-----------------------------------------------------
   bme.readTemperature();   //必须读取这些值才能计算出准确的大气压
@@ -313,29 +365,10 @@ void loop()
   if (middle) //Middle Button is Pressed
   {
     middle = false;
-   
-  //  if (page == 1 && menuitem==5)       // vacuumPump Control 
-  //  {
-  //    if (vacuumPump) 
-  //    {
-  //      
-  //      menuItem5 = "Pump: ON";
-  //      
- //       }
-  //    else 
-  //    {
-  //       
- //       menuItem5 = "Pump: OFF";
-//
- //      }
- //   }
-
     if(page == 1 && menuitem == 6)      // Reset
     {
       resetDefaults();
     }
-
-
     else if (page == 1 && menuitem <= 5) 
     {
       page=2;
@@ -343,16 +376,21 @@ void loop()
     else if (page == 2) 
      {
       page=1; 
+      
+      a1 = seaLevelPressure / 4;
+      a2 = siAltitude;
+      a3 = buff2;
+ 
+      EEPROM.update(1, a1);
+      EEPROM.update(2, a2);
+      EEPROM.update(3, a3);
      }
-   }
-
-   delay(50);
+   }   
   }
 //--------------------------↑↑↑Loop↑↑↑------------------------------------------
   
   void drawMenu()
-  {
-    
+{    
   if (page == 1) 
   {    
     display.setTextSize(1);
@@ -474,54 +512,25 @@ void loop()
     seaLevelPressure = 1013;
     siAltitude = 0;
     buff1 = 20.0;
-    buff2 = 5.0;
-    //selectedDifficulty = 0;
+    buff2 = 1.0;
 
-    vacuumPump = false;
-    //menuItem5 = "Pump: OFF";
-    //turnPumpOff();
+    for (int x = 0; x < EEPROM.length(); x = x + 1)   //Loop end of EEPROM address
+    {    
+        if (EEPROM.read(x) == 0)   //If EEPROM address 0
+        {              
+          // do nothing, already clear, go to the next address in order to save time and reduce writes to EEPROM
+        }
+        else {
+          EEPROM.write(x, 0);       // if not write 0 to clear, it takes 3.3mS
+        }
+      }   
   }
 
-//-----------------泵启动------------------------------------
-  void turnPumpOn()
-  {
-    float altiRead = bme.readAltitude(SEALEVELPRESSURE_HPA);
-    if(altiRead < siAltitudeHm)
-    {
-      if(altiRead < siAltitudeHm - buff1)
-      {
-        digitalWrite(pump1, LOW);   //pump1Start
-        digitalWrite(pump2, LOW);   //pump2Start
-        //vacuumPump = true;
-      }
-      else if((altiRead >= siAltitudeHm - buff1) && altiRead < siAltitudeHm - buff2)
-      {
-        digitalWrite(pump1, HIGH);   //pump1Stop
-        digitalWrite(pump2, LOW);   //pump2Start
-       // vacuumPump = true;
-      }
-    }
-    else if(altiRead >= siAltitudeHm + buff2)
-    {
-      digitalWrite(pump1, HIGH);   //pump1Stop
-      digitalWrite(pump2, HIGH);   //pump2Stop
-      //vacuumPump = false;
-    }
-  }
-
-//-----------------泵关闭---------------------------------------------
-    void turnPumpOff()
-  {
-    digitalWrite(pump1, HIGH);   //pump1Stop
-    digitalWrite(pump2, HIGH);   //pump2Stop
-  }
-
-//-----------------旋转编码器时间程序---------------------------------------------------------
+//-----------------旋转编码器中断---------------------------------------------------------
   void timerIsr() 
   {
   encoder->service();
   }
-
 
 //---------------------主界面-------------------------------------------
 void displayHomeScreen()
@@ -531,6 +540,8 @@ void displayHomeScreen()
     display.setTextColor(WHITE);
     display.setCursor(0, 0);
     display.print("JZ-APSD");
+    display.setCursor(65, 0);
+    display.print(i);
     display.drawFastHLine(0,10,128,WHITE);
     display.setCursor(5, 15);
     display.print("Altitude");
@@ -620,55 +631,3 @@ void displayMenuItem(String item, int position, boolean selected)
     display.setCursor(0, position);
     display.print(">"+item);
 }
-
-//----------------------旋转编码器读取------------------------------------------
-/*
- * 
- void readRotaryEncoder()
-{
-  
-  value += encoder->getValue();  
-  if (value/2 > last) 
-  {
-    last = value/2;
-    down = true;
-    delay(150);
-  }
-  else if (value/2 < last) 
-  {
-    last = value/2;
-    up = true;
-    delay(50);
-  }
-}
-*/
-//-------------------------真空泵程序------------------------------------------------
-/*
- * void pumpInit()  //初始化
-{
-  pinMode(pump1, OUTPUT);
-  pinMode(pump2, OUTPUT);
-  digitalWrite(pump1, HIGH);
-  digitalWrite(pump2, HIGH);
-}
-
-void pump1Start()
-{
-  digitalWrite(pump1, LOW);   //pump1Start
-}
-
-void pump2Start()
-{
-  digitalWrite(pump2, LOW);   //pump2Start
-}
-
-void pump1Stop()
-{
-  digitalWrite(pump1, HIGH);   //pump1Stop
-}
-
-void pump2Stop()
-{
-  digitalWrite(pump2, HIGH);   //pump2Stop
-}
-*/
