@@ -35,7 +35,7 @@
  *        t12为观测前12小时气温，单位℃。
  *        
  *    本地当天海平面气压查询网址：
- *    http://www.t7online.com/cncnstdf.htm
+ *    http://www.t7online.com//cgi-bin/regframe?3&PRG=detail&TIME=std&LANG=cn&WMO=58606&ART=luftdruck
  *    2017/6/13 14：00 南昌 海平面气压为：1007hpa  办公室海拔20m
  *    
  *    标准海平面气压为：1013.25hpa
@@ -62,6 +62,8 @@
  * 2017.6.27
  * 原来是OLED连接线问题，排线时候使用了一根U槽传感器的四芯线，较细，而且有1米左右，线路绕在开关电源附近；
  * 更换了一根较粗的半米长四芯线，远离开关电源，问题解除，看门狗也不需要了。：P
+ * 2017.6.29
+ * 重做断电保存，更换库<EEPROM.h>为<EEPROMex.h>，更方便的存取各类数值。
 */
 
 //----------------------加载库文件--------------------------------------------
@@ -76,7 +78,7 @@
 #include <ClickEncoder.h>
 #include <TimerOne.h>
 
-#include <EEPROM.h>
+#include <EEPROMex.h>
 
 #include <Adafruit_SleepyDog.h>
 
@@ -123,6 +125,7 @@ int a2 = 0;
 
 int addr = 0;
 float a3 = 0.0;
+float a4 = 0.0;
 
 
 boolean up = false;
@@ -162,13 +165,15 @@ void setup()
   digitalWrite(pump2, HIGH);
   
 //------------EEPROM------------------------------------
-        a1 = EEPROM.read(1);
-        a2 = EEPROM.read(2);
-        a3 = EEPROM.read(3);
+        a1 = EEPROM.readInt(0);
+        a2 = EEPROM.readInt(2);
+        a3 = EEPROM.readFloat(4);
+        a4 = EEPROM.readFloat(8);
 
-  seaLevelPressure = a1 * 4;
+  seaLevelPressure = a1;
   siAltitude = a2;
   buff2 = a3;
+  buff1 = a4;
 }
 
 
@@ -202,9 +207,9 @@ void loop()
     {
       vacuumPump = false;
       i ++;
-      delay(100);
+      delay(200);
     }
-    if(i >= 60)
+    if(i >= 100)
     {
       i = 0;
       Watchdog.enable(50);   //补偿n次后看门狗启动。
@@ -285,6 +290,10 @@ void loop()
   {
     up = false;
     siAltitude--;
+    if(siAltitude == -2)
+    {
+      siAltitude = 40;
+    }
   }
   else if (up && page == 2 && menuitem == 4 ) 
   {
@@ -341,6 +350,10 @@ void loop()
   {
     down = false;
     siAltitude++;
+    if(siAltitude == 41)
+    {
+      siAltitude = -1;
+    }
   }
   else if (down && page == 2 && menuitem == 4) 
   {
@@ -377,13 +390,15 @@ void loop()
      {
       page=1; 
       
-      a1 = seaLevelPressure / 4;
+      a1 = seaLevelPressure;
       a2 = siAltitude;
       a3 = buff2;
+      a4 = buff1;
  
-      EEPROM.update(1, a1);
-      EEPROM.update(2, a2);
-      EEPROM.update(3, a3);
+      EEPROM.updateInt(0, a1);
+      EEPROM.updateInt(2, a2);
+      EEPROM.updateFloat(4, a3);
+      EEPROM.updateFloat(8, a4);
      }
    }   
   }
@@ -514,7 +529,7 @@ void loop()
     buff1 = 20.0;
     buff2 = 1.0;
 
-    for (int x = 0; x < EEPROM.length(); x = x + 1)   //Loop end of EEPROM address
+   /* for (int x = 0; x < EEPROM.length(); x = x + 1)   //Loop end of EEPROM address
     {    
         if (EEPROM.read(x) == 0)   //If EEPROM address 0
         {              
@@ -523,7 +538,7 @@ void loop()
         else {
           EEPROM.write(x, 0);       // if not write 0 to clear, it takes 3.3mS
         }
-      }   
+      }  */ 
   }
 
 //-----------------旋转编码器中断---------------------------------------------------------
