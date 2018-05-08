@@ -5,3 +5,4 @@
 > ![ 电路原理](/APSD_bb.png)
 >
 > [详细内容见JZ-APSD.ino](/JZ-APSD.ino)
+> [操作说明](https://shimo.im/docs/Y8nY2oTyeAoOTrNK/)
